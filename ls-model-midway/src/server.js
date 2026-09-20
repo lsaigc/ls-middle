@@ -1,6 +1,16 @@
 'use strict';
 
 const { createProxyServer } = require('./proxy');
+const path = require('node:path');
+
+function loadConfig() {
+  try {
+    process.loadEnvFile(path.join(__dirname, '..', '.env'));
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
+  return readConfig(process.env);
+}
 
 function readConfig(env) {
   const upstreamBaseUrl = String(env.UPSTREAM_BASE_URL || '').trim();
@@ -51,7 +61,7 @@ function startServer(config) {
 
 if (require.main === module) {
   try {
-    const server = startServer(readConfig(process.env));
+    const server = startServer(loadConfig());
     server.once('error', reportStartupError);
   } catch (error) {
     reportStartupError(error);
@@ -63,4 +73,4 @@ function reportStartupError(error) {
   process.exitCode = 1;
 }
 
-module.exports = { readConfig, startServer };
+module.exports = { readConfig, loadConfig, startServer };

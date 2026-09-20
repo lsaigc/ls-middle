@@ -1,7 +1,20 @@
 # ls-model-midway
 
 部署在可访问模型官方 API 的节点上的 HTTP 流式中转。支持 Tripo3D 及其他
-HTTP API，通过配置映射 URL，业务参数和响应内容透传。Node.js 20+，无第三方依赖。
+HTTP API，通过配置映射 URL，业务参数和响应内容透传。Node.js 20.12.0+，无第三方依赖。
+
+## 使用 .env 启动
+
+在 `ls-model-midway` 目录下创建 `.env`（可参考 `.env.example`）：
+
+```dotenv
+UPSTREAM_ROUTES={"tripo":"https://openapi.tripo3d.ai"}
+PORT=3000
+```
+
+然后在该目录执行 `npm start`。启动时自动加载项目根目录的 `.env`，已设置的
+系统或部署平台环境变量优先于文件中的同名变量。修改 `.env` 后需要重启。
+`.env` 已加入 Git 忽略规则，不应提交真实配置。
 
 ## 多供应商配置（推荐）
 
@@ -66,7 +79,8 @@ UPSTREAM_BASE_URL=https://openapi.tripo3d.ai PORT=3000 npm start
 | `UPSTREAM_BASE_URL` | 未设置路由映射时必填的单上游地址 |
 | `PORT` | 默认 `3000`，范围 `0`–`65535` |
 
-服务不自动读取 `.env`；请通过部署平台或 shell 注入，`.env.example` 提供配置模板。
+服务自动读取项目根目录的 `.env`，也支持部署平台或 shell 注入，`.env.example` 提供配置模板。
+没有 `.env` 文件时继续使用系统环境变量。
 配置错误时启动失败。启动日志仅包含端口、路由名称和上游 origin。
 
 ## 透传边界与部署
