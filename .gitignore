@@ -1,0 +1,17 @@
+api-service/
+.DS_Store
+dump.rdb
+.claude/*
+.workbuddy/*
+/huobao-drama/
+/ls-tutorial/
+/wx-app/
+ls-work-flow/data/workflows/workflows.json
+.env
+.b.env
+.worktrees/
+outputs/
+**/tmp/
+
+ls-school/service/.env
+ls-work-flow/.env
