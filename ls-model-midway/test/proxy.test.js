@@ -249,6 +249,42 @@ test('routes providers and preserves task JSON, upload bytes, auth and raw URL',
   assert.equal(received.length, count);
 });
 
+test('forwards Azure OpenAI paths, API versions, credentials and request bodies', async () => {
+  const received = [];
+  const upstream = track(http.createServer(async (request, response) => {
+    const chunks = [];
+    for await (const chunk of request) chunks.push(chunk);
+    received.push({ url: request.url, headers: request.headers,
+      body: Buffer.concat(chunks) });
+    response.end('ok');
+  }));
+  upstream.listen(0, '127.0.0.1');
+  await onceListening(upstream);
+  const proxy = track(createProxyServer({ upstreamRoutes: {
+    'azure-sub1512448-intsig-eus2': `http://127.0.0.1:${upstream.address().port}`,
+  } }));
+  proxy.listen(0, '127.0.0.1');
+  await onceListening(proxy);
+  for (const endpoint of ['responses', 'chat/completions', 'images/generations', 'images/edits']) {
+    const multipart = endpoint === 'images/edits';
+    const body = multipart
+      ? Buffer.from('--azure\r\nContent-Disposition: form-data; name="image"; filename="a.png"\r\n\r\n\x00\xff\r\n--azure--\r\n', 'latin1')
+      : Buffer.from('{ "model": "deployment-name", "stream": true }');
+    const contentType = multipart ? 'multipart/form-data; boundary=azure' : 'application/json';
+    const path = `/openai/v1/${endpoint}?api-version=preview&x=%2f+%20`;
+    await sendRequest({ port: proxy.address().port, method: 'POST',
+      path: `/azure-sub1512448-intsig-eus2${path}`, body,
+      headers: { 'api-key': 'test-azure-key', authorization: 'Bearer test-token',
+        'content-type': contentType } });
+    const actual = received.at(-1);
+    assert.equal(actual.url, path);
+    assert.equal(actual.headers['api-key'], 'test-azure-key');
+    assert.equal(actual.headers.authorization, 'Bearer test-token');
+    assert.equal(actual.headers['content-type'], contentType);
+    assert.deepEqual(actual.body, body);
+  }
+});
+
 test('rejects malformed route maps and ambiguous upstream URLs at startup', () => {
   for (const upstreamRoutes of [null, [], {}, { 'a/b': 'https://example.com' },
     { tripo: 'ftp://example.com' }, { tripo: 'https://user:pass@example.com' },

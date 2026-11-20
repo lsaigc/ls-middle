@@ -2,12 +2,29 @@
 
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { mkdtempSync, mkdirSync, copyFileSync, writeFileSync, rmSync } = require('node:fs');
+const { mkdtempSync, mkdirSync, copyFileSync, readFileSync, writeFileSync, rmSync } = require('node:fs');
+const { parseEnv } = require('node:util');
 const { tmpdir } = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
 const { readConfig } = require('../src/server');
+
+test('example config includes distinct Azure resources alongside existing providers', () => {
+  const env = parseEnv(readFileSync(path.join(__dirname, '../.env.example'), 'utf8'));
+  const { upstreamRoutes } = readConfig(env);
+  assert.equal(upstreamRoutes.tripo, 'https://openapi.tripo3d.ai');
+  assert.equal(upstreamRoutes['azure-sub1512442-intsig-jpe'],
+    'https://sub1512442-intsig-jpe.openai.azure.com');
+  for (const subscription of ['1512442', '1512444', '1512448', '1527520', '1527529']) {
+    assert.equal(upstreamRoutes[`azure-sub${subscription}-intsig-eus2`],
+      `https://sub${subscription}-intsig-eus2.services.ai.azure.com`);
+    for (const region of ['polandcentral', 'swedencentral', 'uaenorth', 'westus3']) {
+      assert.equal(upstreamRoutes[`azure-sub${subscription}-cp-${region}`],
+        `https://sub${subscription}-cp-${region}.services.ai.azure.com`);
+    }
+  }
+});
 
 test('loads project .env, preserves environment overrides and allows a missing file', (t) => {
   const dir = mkdtempSync(path.join(tmpdir(), 'midway-env-'));

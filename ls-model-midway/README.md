@@ -1,6 +1,6 @@
 # ls-model-midway
 
-部署在可访问模型官方 API 的节点上的 HTTP 流式中转。支持 Tripo3D 及其他
+部署在可访问模型官方 API 的节点上的 HTTP 流式中转。支持 Tripo3D、Azure OpenAI 及其他
 HTTP API，通过配置映射 URL，业务参数和响应内容透传。Node.js 20.12.0+，无第三方依赖。
 
 ## 使用 .env 启动
@@ -62,6 +62,44 @@ curl "https://你的中转域名/tripo/v3/tasks/${TASK_ID}" \
 图片上传等其他接口也只替换 URL 前缀，字段以官方文档为准。程序不绑定模型版本，
 不解析 JSON 或 multipart，也不轮询任务。若使用旧版 API，可单独配置对应旧版上游。
 
+## Azure OpenAI 中转
+
+`.env.example` 已按 `ls-model-api/configs/model-providers.local.json` 中的 Azure 配置，
+为 26 个不同资源分别配置固定上游。路由名为 `azure-` 加资源主机名第一段，
+目标为该资源的 origin；请求路径中的 `/openai/v1` 由调用方保留。
+不同资源分别路由，调用方继续使用该资源对应的密钥和模型部署名。
+
+| 资源路由 | 上游 origin |
+| --- | --- |
+| `azure-sub1512442-intsig-jpe` | `https://sub1512442-intsig-jpe.openai.azure.com` |
+| `azure-sub{订阅号}-intsig-eus2` | `https://sub{订阅号}-intsig-eus2.services.ai.azure.com` |
+| `azure-sub{订阅号}-cp-{区域}` | `https://sub{订阅号}-cp-{区域}.services.ai.azure.com` |
+
+上表订阅号为 `1512442`、`1512444`、`1512448`、`1527520`、`1527529`；
+`cp` 区域为 `polandcentral`、`swedencentral`、`uaenorth`、`westus3`。
+已有 `.env` 的部署需将模板中的 Azure 路由合并到 `UPSTREAM_ROUTES` 后重启。
+
+例如参考项目中 `sub1512448-intsig-eus2` 的提供商配置，保持 `provider: "azure"`、
+`apiKey`、`model` 等字段不变，仅将 `baseUrl` 从
+`https://sub1512448-intsig-eus2.services.ai.azure.com/openai/v1` 改为：
+
+```text
+https://你的中转域名/azure-sub1512448-intsig-eus2/openai/v1
+```
+
+Responses、Chat Completions、图片生成和 multipart 图片编辑均透传。
+`api-key`、`Authorization`、`api-version` 查询参数及 SSE 响应沿用调用方和上游的值。
+中转不存储 Azure 密钥，也不在多个资源间自动调度或切换。
+
+Responses 调用示例（预先设置对应资源的 `AZURE_API_KEY` 和 `AZURE_DEPLOYMENT`）：
+
+```bash
+curl 'https://你的中转域名/azure-sub1512448-intsig-eus2/openai/v1/responses' \
+  -H "api-key: ${AZURE_API_KEY}" \
+  -H 'Content-Type: application/json' \
+  -d "{\"model\":\"${AZURE_DEPLOYMENT}\",\"input\":\"你好\",\"stream\":true}"
+```
+
 ## 单上游模式（兼容原配置）
 
 不设置 `UPSTREAM_ROUTES` 时使用：
@@ -102,4 +140,5 @@ npm test
 ```
 
 测试使用本地上游验证多供应商分流、任务 JSON 和上传字节透传、Authorization、原始查询串、
-未知路由、非法配置、流式响应、上游异常和单上游兼容性，不消耗官方模型额度。
+未知路由、非法配置、流式响应、上游异常和单上游兼容性，以及 Azure 资源路由配置、
+`/openai/v1` 路径、API 版本查询串、认证头和图片编辑上传透传，不消耗官方模型额度。
